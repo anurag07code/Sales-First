@@ -1,11 +1,21 @@
 import { useState, useRef, useEffect } from "react";
-import { FileText, Upload, Download, Trash2, Loader2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { FileText, Upload, Trash2, Loader2, ArrowRight, HardDrive, Cloud, Folder } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import RFPFlowTimeline from "@/components/RFPFlowTimeline";
-import RFPSummaryAccordion from "@/components/RFPSummaryAccordion";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import AIAssistantPanel from "@/components/AIAssistantPanel";
 import { MOCK_RFP_PROJECTS } from "@/lib/mockData";
+import { RFP_RESULT_DATA } from "@/lib/data/rfpResult";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -19,20 +29,29 @@ import {
 } from "@/components/ui/alert-dialog";
 
 const RFPLifecycle = () => {
+  const navigate = useNavigate();
   const [projects, setProjects] = useState(MOCK_RFP_PROJECTS);
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
   const [processingProjects, setProcessingProjects] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Metadata form state
+  const [contextDialogOpen, setContextDialogOpen] = useState(false);
+  const [contextProjectId, setContextProjectId] = useState<string | null>(null);
+  const [rfpType, setRfpType] = useState<string>("new");
+  const [industry, setIndustry] = useState<string>("");
+  const [subIndustry, setSubIndustry] = useState<string>("");
+  const [orgType, setOrgType] = useState<string>("Gov");
+  const [department, setDepartment] = useState<string>("");
+  const [issueDate, setIssueDate] = useState<string>("");
+  const [deadline, setDeadline] = useState<string>("");
+  const [confidentiality, setConfidentiality] = useState<string>("public");
+
   const handleProjectClick = (projectId: string) => {
-    // Toggle selection: if clicking the same project, deselect it
-    if (selectedProjectId === projectId) {
-      setSelectedProjectId(null);
-    } else {
-      setSelectedProjectId(projectId);
-    }
+    // Navigate to detail page
+    navigate(`/rfp-lifecycle/${projectId}`);
   };
 
   const handleDeleteClick = (e: React.MouseEvent, projectId: string) => {
@@ -44,9 +63,6 @@ const RFPLifecycle = () => {
   const handleDeleteConfirm = () => {
     if (projectToDelete) {
       setProjects(projects.filter((p) => p.id !== projectToDelete));
-      if (selectedProjectId === projectToDelete) {
-        setSelectedProjectId(null);
-      }
       toast.success("Project deleted successfully");
       setDeleteDialogOpen(false);
       setProjectToDelete(null);
@@ -54,7 +70,24 @@ const RFPLifecycle = () => {
   };
 
   const handleUploadClick = () => {
+    setUploadDialogOpen(true);
+  };
+
+  const handleLocalDriveUpload = () => {
     fileInputRef.current?.click();
+    setUploadDialogOpen(false);
+  };
+
+  const handleGoogleDriveUpload = () => {
+    // TODO: Implement Google Drive integration
+    toast.info("Google Drive integration coming soon!");
+    setUploadDialogOpen(false);
+  };
+
+  const handleSharePointUpload = () => {
+    // TODO: Implement SharePoint integration
+    toast.info("Microsoft SharePoint integration coming soon!");
+    setUploadDialogOpen(false);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -83,7 +116,7 @@ const RFPLifecycle = () => {
       uploadedFileName: file.name,
       tabs: [],
       journeyBlocks: [
-        { name: "RFP Received", status: "pending" as const, icon: "FileText" },
+        { name: "RFP Received", status: "completed" as const, icon: "FileText" },
         { name: "Initial Analysis", status: "pending" as const, icon: "Search" },
         { name: "Scope Definition", status: "pending" as const, icon: "Target" },
         { name: "Cost Estimation", status: "pending" as const, icon: "Calculator" },
@@ -99,6 +132,10 @@ const RFPLifecycle = () => {
     // Add project to list
     setProjects((prev) => [newProject, ...prev]);
 
+    // Open metadata context dialog for the new project
+    setContextProjectId(newProjectId);
+    setContextDialogOpen(true);
+
     // Mark as processing
     setProcessingProjects((prev) => new Set(prev).add(newProjectId));
 
@@ -108,7 +145,30 @@ const RFPLifecycle = () => {
     toast.success("RFP uploaded successfully");
   };
 
-  // Handle processing completion after 10 seconds
+  const handleSaveContext = () => {
+    if (!contextProjectId) return;
+    setProjects((prev) =>
+      prev.map((p) =>
+        p.id === contextProjectId
+          ? {
+              ...p,
+              context: {
+                rfpType,
+                industry,
+                subIndustry,
+                buyerContext: { organizationType: orgType, department },
+                keyDates: { issueDate, submissionDeadline: deadline },
+                confidentiality,
+              },
+            }
+          : p
+      )
+    );
+    setContextDialogOpen(false);
+    toast.success("RFP context saved");
+  };
+
+  // Handle processing completion after 10 seconds - simulate analysis and add RFP estimation
   useEffect(() => {
     const timers: NodeJS.Timeout[] = [];
 
@@ -120,26 +180,33 @@ const RFPLifecycle = () => {
           return newSet;
         });
 
-        // Update project journey blocks to show some progress
+        // Update project journey blocks and add RFP estimation data
         setProjects((prev) =>
           prev.map((project) => {
             if (project.id === projectId) {
               return {
                 ...project,
-                journeyBlocks: project.journeyBlocks.map((block, index) =>
-                  index === 0
-                    ? { ...block, status: "completed" as const }
-                    : index === 1
-                    ? { ...block, status: "in-progress" as const }
-                    : block
-                ),
+                journeyBlocks: [
+                  { name: "RFP Received", status: "completed" as const, icon: "FileText" },
+                  { name: "Initial Analysis", status: "completed" as const, icon: "Search" },
+                  { name: "Scope Definition", status: "completed" as const, icon: "Target" },
+                  { name: "Cost Estimation", status: "completed" as const, icon: "Calculator" },
+                  { name: "Resource Planning", status: "completed" as const, icon: "Users" },
+                  { name: "Risk Assessment", status: "completed" as const, icon: "AlertTriangle" },
+                  { name: "Proposal Draft", status: "in-progress" as const, icon: "FileEdit" },
+                  { name: "Legal Review", status: "pending" as const, icon: "Scale" },
+                  { name: "Final Approval", status: "pending" as const, icon: "CheckCircle" },
+                  { name: "Submission", status: "pending" as const, icon: "Send" },
+                ],
+                // Add RFP estimation data from analysis
+                rfpEstimation: RFP_RESULT_DATA.rfp_estimation,
               };
             }
             return project;
           })
         );
 
-        toast.success("RFP processing completed successfully!");
+        toast.success("RFP analysis completed successfully! Click the project to view details.");
       }, 10000); // 10 seconds
 
       timers.push(timer);
@@ -183,7 +250,7 @@ const RFPLifecycle = () => {
               <div className="flex-1 min-w-0">
                 <h2 className="text-xl font-bold mb-1">Upload New RFP</h2>
                 <p className="text-sm text-muted-foreground">
-                  Click to upload a new RFP document for analysis
+                  Click to upload from Google Drive, SharePoint, or Local Drive
                 </p>
               </div>
             </div>
@@ -191,74 +258,52 @@ const RFPLifecycle = () => {
 
           {/* Existing Projects */}
           {projects.map((project) => (
-            <div key={project.id} className="flex flex-col gap-4">
-              <Card
-                className={`gradient-card p-6 cursor-pointer transition-all hover:border-foreground/20 hover:shadow-elegant ${
-                  selectedProjectId === project.id
-                    ? "border-foreground/30 shadow-elegant"
-                    : ""
-                }`}
-                onClick={() => handleProjectClick(project.id)}
-              >
-                <div className="flex items-start gap-4">
-                  <div className="p-3 rounded-xl bg-primary/10">
-                    <FileText className="h-6 w-6 text-primary" />
+            <Card
+              key={project.id}
+              className="gradient-card p-6 cursor-pointer transition-all hover:border-foreground/20 hover:shadow-elegant group"
+              onClick={() => handleProjectClick(project.id)}
+            >
+              <div className="flex items-start gap-4">
+                <div className="p-3 rounded-xl bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                  <FileText className="h-6 w-6 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-3 mb-1">
+                    <h2 className="text-xl font-bold truncate">{project.rfpTitle}</h2>
+                    {(project as any).rfpEstimation && (
+                      <Badge className="bg-primary/10 text-primary border-primary/20">
+                        Analysis Ready
+                      </Badge>
+                    )}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <h2 className="text-xl font-bold mb-1 truncate">{project.rfpTitle}</h2>
-                    <p className="text-sm text-muted-foreground truncate">
-                      Uploaded: {project.uploadedFileName}
-                    </p>
-                  </div>
+                  <p className="text-sm text-muted-foreground truncate mb-2">
+                    Uploaded: {project.uploadedFileName}
+                  </p>
                   {processingProjects.has(project.id) ? (
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      <span>Processing</span>
+                      <span>Processing analysis...</span>
                     </div>
                   ) : (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="flex-shrink-0 hover:bg-destructive/10 hover:text-destructive"
-                      onClick={(e) => handleDeleteClick(e, project.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center gap-2 text-sm text-primary group-hover:gap-3 transition-all">
+                      <span className="font-medium">View Details</span>
+                      <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                    </div>
                   )}
                 </div>
-              </Card>
-
-              {/* RFP Details - Shown directly below the selected project */}
-              {selectedProjectId === project.id && (
-                <div className="grid lg:grid-cols-3 gap-6">
-                  {/* Left Panel - RFP Flow */}
-                  <div className="lg:col-span-1">
-                    <Card className="gradient-card p-6 sticky top-6">
-                      <RFPFlowTimeline blocks={project.journeyBlocks} />
-                    </Card>
-                  </div>
-
-                  {/* Center/Right Panel - Content */}
-                  <div className="lg:col-span-2">
-                    <div className="relative">
-                      {/* Fixed Download Button */}
-                      <div className="absolute top-0 right-0 z-10">
-                        <Button
-                          variant="outline"
-                          className="gap-2 shadow-elegant"
-                          onClick={() => toast.success("RFP Summary downloaded successfully!")}
-                        >
-                          <Download className="h-4 w-4" />
-                          Download Summary
-                        </Button>
-                      </div>
-
-                      <RFPSummaryAccordion tabs={project.tabs} />
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="flex-shrink-0 hover:bg-destructive/10 hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteClick(e, project.id);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </Card>
           ))}
         </div>
 
@@ -296,8 +341,173 @@ const RFPLifecycle = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Floating AI Assistant */}
-      <AIAssistantPanel />
+      {/* Upload Source Dialog */}
+      <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Upload RFP Document</DialogTitle>
+            <DialogDescription>
+              Choose your file upload source to upload an RFP document for analysis
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-1 gap-3 mt-4">
+            {/* Local Drive */}
+            <Card
+              className="p-4 cursor-pointer transition-all hover:border-primary/50 hover:shadow-md border-2"
+              onClick={handleLocalDriveUpload}
+            >
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-lg bg-primary/10">
+                  <HardDrive className="h-6 w-6 text-primary" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold mb-1">Local Drive</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Upload from your computer
+                  </p>
+                </div>
+                <ArrowRight className="h-5 w-5 text-muted-foreground" />
+              </div>
+            </Card>
+
+            {/* Google Drive */}
+            <Card
+              className="p-4 cursor-pointer transition-all hover:border-primary/50 hover:shadow-md border-2"
+              onClick={handleGoogleDriveUpload}
+            >
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-lg bg-primary/10">
+                  <Cloud className="h-6 w-6 text-primary" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold mb-1">Google Drive</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Import from your Google Drive
+                  </p>
+                </div>
+                <ArrowRight className="h-5 w-5 text-muted-foreground" />
+              </div>
+            </Card>
+
+            {/* MS SharePoint */}
+            <Card
+              className="p-4 cursor-pointer transition-all hover:border-primary/50 hover:shadow-md border-2"
+              onClick={handleSharePointUpload}
+            >
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-lg bg-primary/10">
+                  <Folder className="h-6 w-6 text-primary" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold mb-1">Microsoft SharePoint</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Import from SharePoint
+                  </p>
+                </div>
+                <ArrowRight className="h-5 w-5 text-muted-foreground" />
+              </div>
+            </Card>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* RFP Context Dialog */}
+      <Dialog open={contextDialogOpen} onOpenChange={setContextDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>RFP Context</DialogTitle>
+            <DialogDescription>
+              Provide contextual details so the LLM can better understand your RFP.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+            {/* RFP Type */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">RFP Type</label>
+              <Select value={rfpType} onValueChange={setRfpType}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="new">New</SelectItem>
+                  <SelectItem value="renewal">Existing - Renewal</SelectItem>
+                  <SelectItem value="extension">Existing - Extension</SelectItem>
+                  <SelectItem value="change">Existing - Change Request</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Confidentiality */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Confidentiality</label>
+              <Select value={confidentiality} onValueChange={setConfidentiality}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select confidentiality" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="public">Public</SelectItem>
+                  <SelectItem value="internal">Internal</SelectItem>
+                  <SelectItem value="confidential">Confidential</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Industry */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Industry (Top-level)</label>
+              <Input value={industry} onChange={(e) => setIndustry(e.target.value)} placeholder="e.g., Banking" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Sub‑industry</label>
+              <Input value={subIndustry} onChange={(e) => setSubIndustry(e.target.value)} placeholder="e.g., Retail Banking" />
+            </div>
+
+            {/* Buyer Context */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Organization Type</label>
+              <Select value={orgType} onValueChange={setOrgType}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select organization type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Gov">Gov</SelectItem>
+                  <SelectItem value="PSU">PSU</SelectItem>
+                  <SelectItem value="Private">Private</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Department</label>
+              <Input value={department} onChange={(e) => setDepartment(e.target.value)} placeholder="e.g., IT, Procurement" />
+            </div>
+
+            {/* Dates */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Issue Date</label>
+              <Input type="date" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Submission Deadline</label>
+              <Input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="ghost" onClick={() => setContextDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleSaveContext}>Save</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Floating AI Assistant - Default Variant */}
+      <AIAssistantPanel
+        projects={projects.map((p) => ({
+          id: p.id,
+          rfpTitle: p.rfpTitle,
+          uploadedFileName: p.uploadedFileName,
+        }))}
+        variant="default"
+      />
     </div>
   );
 };

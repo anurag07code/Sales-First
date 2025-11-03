@@ -17,17 +17,34 @@ const RFPFlowTimeline = ({ blocks }: RFPFlowTimelineProps) => {
   const [selectedBlock, setSelectedBlock] = useState<JourneyBlock | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-  const getStatusColor = (status: string) => {
+  const getStatusBg = (status: string) => {
     switch (status) {
       case "completed":
-        return "bg-success text-white";
+        return "bg-success";
       case "in-progress":
-        return "bg-primary text-white glow-primary";
+        return "bg-primary glow-primary";
       case "pending":
-        return "bg-muted text-muted-foreground";
+        return "bg-muted";
       default:
         return "bg-muted";
     }
+  };
+
+  const getIconColor = (status: string) => {
+    switch (status) {
+      case "completed":
+      case "in-progress":
+        return "text-white"; // strong contrast on colored circles
+      default:
+        return "text-foreground"; // solid contrast in light mode
+    }
+  };
+
+  const getRingClass = (status: string) => {
+    if (status === "pending") {
+      return "ring-1 ring-border"; // add subtle border for light mode contrast
+    }
+    return "";
   };
 
   const getConnectorColor = (status: string) => {
@@ -70,45 +87,66 @@ const RFPFlowTimeline = ({ blocks }: RFPFlowTimelineProps) => {
 
   return (
     <>
-      <div className="space-y-4">
-        <h2 className="text-xl font-bold mb-4">RFP Journey Flow</h2>
+      <div className="w-full">
+        <h2 className="text-xl font-bold mb-6">RFP Journey Flow</h2>
         
-        {blocks.map((block, index) => {
-          const IconComponent = icons[block.icon as keyof typeof icons] as React.ComponentType<{ className?: string }>;
-          const isLast = index === blocks.length - 1;
+        {/* Horizontal Container - No Scroll, All Steps Visible */}
+        <div className="w-full relative">
+          {/* Responsive grid: compact on mobile, expanded on md+ */}
+          <div className="grid grid-cols-5 md:grid-cols-10 gap-2 relative">
+            {blocks.map((block, index) => {
+              const IconComponent = icons[block.icon as keyof typeof icons] as React.ComponentType<{ className?: string }>;
+              const isLast = index === blocks.length - 1;
 
-          return (
-            <div key={index} className="relative">
-              <div 
-                className="flex items-center gap-4 cursor-pointer group"
-                onClick={() => handleBlockClick(block)}
-              >
-                <div className={`relative z-10 flex items-center justify-center w-12 h-12 rounded-full ${getStatusColor(block.status)} transition-all duration-300 group-hover:scale-110`}>
-                  {IconComponent && <IconComponent className="h-5 w-5" />}
+              return (
+                <div key={index} className="relative">
+                  {/* Main Block */}
+                  <div 
+                    className="flex flex-col items-center cursor-pointer group w-full"
+                    onClick={() => handleBlockClick(block)}
+                  >
+                    {/* Icon Circle */}
+                    <div className={`relative z-10 flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-full ${getStatusBg(block.status)} ${getRingClass(block.status)} transition-all duration-300 group-hover:scale-110 shadow-lg mx-auto`}>
+                      {IconComponent && <IconComponent className={`h-4 w-4 sm:h-5 sm:w-5 ${getIconColor(block.status)}`} />}
+                    </div>
+                    
+                    {/* Horizontal Connector Line to Next Block */}
+                    {!isLast && (
+                      <div 
+                        className="absolute top-5 sm:top-6 left-1/2 z-0"
+                        style={{ width: 'calc(100% + 0.5rem)' }}
+                      >
+                        <div
+                          className={`h-0.5 w-full ${getConnectorColor(block.status)} transition-all duration-300`}
+                        />
+                      </div>
+                    )}
+                    
+                    {/* Card with Name and Status */}
+                    <Card className={`mt-3 sm:mt-4 p-2 sm:p-3 w-full text-center gradient-card border-t-2 transition-all group-hover:shadow-elegant ${
+                      block.status === "completed"
+                        ? "border-t-success"
+                        : block.status === "in-progress"
+                        ? "border-t-primary"
+                        : "border-t-border"
+                    }`}>
+                      <p className="font-medium text-[10px] sm:text-xs mb-1 line-clamp-2 leading-tight">{block.name}</p>
+                      <p className={`text-[9px] sm:text-[10px] capitalize ${
+                        block.status === "completed"
+                          ? "text-success"
+                          : block.status === "in-progress"
+                          ? "text-primary font-semibold"
+                          : "text-muted-foreground"
+                      }`}>
+                        {block.status.replace("-", " ")}
+                      </p>
+                    </Card>
+                  </div>
                 </div>
-                
-                <div className="flex-1">
-                  <Card className={`p-3 gradient-card border-l-4 transition-all group-hover:shadow-elegant ${
-                    block.status === "completed"
-                      ? "border-l-success"
-                      : block.status === "in-progress"
-                      ? "border-l-primary"
-                      : "border-l-border"
-                  }`}>
-                    <p className="font-medium">{block.name}</p>
-                    <p className="text-xs text-muted-foreground capitalize mt-1">{block.status.replace("-", " ")}</p>
-                  </Card>
-                </div>
-              </div>
-
-              {!isLast && (
-                <div
-                  className={`absolute left-6 top-12 w-0.5 h-8 -translate-x-1/2 ${getConnectorColor(block.status)}`}
-                />
-              )}
-            </div>
-          );
-        })}
+              );
+            })}
+          </div>
+        </div>
       </div>
 
       {/* Block Details Dialog */}

@@ -1,4 +1,4 @@
-import { NavLink, Link } from "react-router-dom";
+import { NavLink, Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Menu, X } from "lucide-react";
@@ -6,6 +6,7 @@ import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 
 const TopNavigation = () => {
+  const location = useLocation();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -18,6 +19,7 @@ const TopNavigation = () => {
   }, []);
 
   const navLinks = [
+    { to: "/", label: "Home" },
     { to: "/brand-analysis", label: "Brand Analysis" },
     { to: "/rfp-lifecycle", label: "RFP Lifecycle" },
     { to: "/contracts", label: "Contracts" },
@@ -80,7 +82,10 @@ const TopNavigation = () => {
               >
                 {link.label}
                 <span 
-                  className="absolute bottom-0 left-1/2 w-0 h-0.5 transition-all duration-300 -translate-x-1/2 group-hover:w-3/4"
+                  className={cn(
+                    "absolute bottom-0 left-1/2 h-0.5 -translate-x-1/2 transition-all duration-300",
+                    location.pathname === link.to ? "w-3/4" : "w-0 group-hover:w-3/4"
+                  )}
                   style={{ backgroundColor: '#3B82F6' }}
                 />
               </NavLink>

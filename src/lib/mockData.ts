@@ -1,4 +1,5 @@
 // Mock Data for SalesFirst Application
+import { RFP_RESULT_DATA } from "./data/rfpResult";
 
 export const MOCK_COMPANY_LIST = [
   {
@@ -393,6 +394,25 @@ export const MOCK_RFP_PROJECTS = [
       { name: "Final Approval", status: "pending" as const, icon: "CheckCircle" },
       { name: "Submission", status: "pending" as const, icon: "Send" },
     ],
+  },
+  {
+    id: "4",
+    rfpTitle: "SBI Internet Banking Kiosks & Account Opening Tabs",
+    uploadedFileName: RFP_RESULT_DATA.file_name,
+    tabs: [],
+    journeyBlocks: [
+      { name: "RFP Received", status: "completed" as const, icon: "FileText" },
+      { name: "Initial Analysis", status: "completed" as const, icon: "Search" },
+      { name: "Scope Definition", status: "completed" as const, icon: "Target" },
+      { name: "Cost Estimation", status: "completed" as const, icon: "Calculator" },
+      { name: "Resource Planning", status: "completed" as const, icon: "Users" },
+      { name: "Risk Assessment", status: "completed" as const, icon: "AlertTriangle" },
+      { name: "Proposal Draft", status: "in-progress" as const, icon: "FileEdit" },
+      { name: "Legal Review", status: "pending" as const, icon: "Scale" },
+      { name: "Final Approval", status: "pending" as const, icon: "CheckCircle" },
+      { name: "Submission", status: "pending" as const, icon: "Send" },
+    ],
+    rfpEstimation: RFP_RESULT_DATA.rfp_estimation,
   },
 ];
 
