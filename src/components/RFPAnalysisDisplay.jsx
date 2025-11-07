@@ -4,12 +4,15 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Building2, DollarSign, Calendar, Users, Code, FileText, Shield, Target, CheckCircle2, Clock, BarChart3, Briefcase, ArrowRight, ListChecks, Sparkles, Zap, Layers, CheckSquare, RefreshCw, Network, Server, Database, Lock, Cpu, Pencil, Check, X, Plus, Search } from "lucide-react";
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 const RFPAnalysisDisplay = ({
   data,
-  fileName
+  fileName,
+  projectId
 }) => {
   // Local editable copy
   const [localData, setLocalData] = useState(data);
@@ -33,6 +36,69 @@ const RFPAnalysisDisplay = ({
   const [regeneratedTick, setRegeneratedTick] = useState(0);
   const [chipsVisible, setChipsVisible] = useState(false);
   const panelsOpen = catalogOpen;
+  // Response Write-up local state
+  const [activeTopic, setActiveTopic] = useState("transition");
+  const [topicContents, setTopicContents] = useState({
+    transition: "Collaborative Model, Business Outcomes, Cost Efficiency, Future-Ready Operations. This approach ensures the provider assumes responsibility across build, operate, and transform phases while aligning with client KPIs.",
+    governance: "Governance cadence, Steering Committee structure, KPIs and SLAs, risk and issue management, change control, and compliance oversight.",
+    continuity: "Business Continuity and DR, RTO/RPO objectives, resourcing model, failover testing cadence, and incident playbooks."
+  });
+  const [kbTopics, setKbTopics] = useState([
+    { key: "transition", name: "Transition", files: [] },
+    { key: "governance", name: "Governance", files: [] },
+    { key: "continuity", name: "Business Continuity", files: [] }
+  ]);
+  const [newTopicName, setNewTopicName] = useState("");
+  const onAddNewTopic = () => {
+    const name = newTopicName.trim();
+    if (!name) return;
+    const key = name.toLowerCase().replace(/\s+/g, "-");
+    setKbTopics(prev => [...prev, { key, name, files: [] }]);
+    setTopicContents(prev => ({ ...prev, [key]: `${name} overview content will be generated here.` }));
+    setNewTopicName("");
+  };
+  const onUploadFiles = (key, filesList) => {
+    const files = Array.from(filesList || []);
+    setKbTopics(prev => prev.map(t => t.key === key ? { ...t, files: [...t.files, ...files.map(f => f.name)] } : t));
+  };
+  const regenerateTopic = (key) => {
+    setTopicContents(prev => ({
+      ...prev,
+      [key]: (prev[key] || "") + "\n\nRegenerated with refined focus based on supporting documents and RFP context."
+    }));
+    toast.success("Regenerated response");
+  };
+  const exportTopic = (key) => {
+    const blob = new Blob([topicContents[key] || ""], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${(fileName || "response").replace(/[^a-z0-9]+/gi, "_").toLowerCase()}_${key}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    toast.success("Exported topic");
+  };
+  const exportAll = () => {
+    const all = Object.entries(topicContents).map(([k, v]) => `# ${k}\n\n${v}`).join("\n\n---\n\n");
+    const blob = new Blob([all], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${(fileName || "response").replace(/[^a-z0-9]+/gi, "_").toLowerCase()}_all_topics.txt`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    toast.success("Exported all topics");
+  };
+  const navigate = useNavigate();
+  const goToChat = () => {
+    if (!projectId) return;
+    const params = new URLSearchParams({ topic: activeTopic });
+    navigate(`/rfp-chat/${projectId}?${params.toString()}`);
+  };
   const openSectionEditor = section => {
     setEditingSection(section);
     setSectionDraft(localData[section] || "");
@@ -235,6 +301,85 @@ const RFPAnalysisDisplay = ({
 
       {/* Main Accordion Sections */}
       <Accordion type="multiple" className="space-y-3">
+        {/* Response Write-up */}
+        <AccordionItem value="response-writeup" className="border-none">
+          <Card className="gradient-card overflow-hidden border-2 border-primary/20 hover:border-primary/40 transition-colors">
+            <AccordionTrigger className="px-6 py-4 hover:no-underline hover:bg-gradient-to-r hover:from-primary/5 hover:to-transparent transition-all">
+              <div className="flex items-center gap-3 flex-1">
+                <div className="p-2.5 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 shadow-sm">
+                  <Pencil className="h-5 w-5 text-primary" />
+                </div>
+                <span className="font-bold text-left text-lg">Response Write-up</span>
+                <span className="ml-auto text-xs text-primary font-semibold bg-primary/10 px-2 py-1 rounded-full">
+                  Draft
+                </span>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="px-6 pb-6">
+              {/* Knowledge Base Builder */}
+              <div className="mb-6 p-4 rounded-xl bg-card border-2 border-primary/20">
+                <h4 className="font-bold mb-2 text-primary">Build Knowledge Base</h4>
+                <p className="text-sm text-muted-foreground mb-4">Enter a new topic and upload supporting documents to improve AI assistance.</p>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="space-y-3">
+                    {kbTopics.map(t => (
+                      <div key={t.key} className="p-3 rounded-lg bg-muted/30 border border-border">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-semibold text-sm">{t.name}</span>
+                          <span className="text-xs text-muted-foreground">{t.files.length} files</span>
+                        </div>
+                        <input type="file" multiple onChange={e => onUploadFiles(t.key, e.target.files)} />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="space-y-3">
+                    <div className="p-3 rounded-lg bg-muted/30 border border-border">
+                      <p className="text-sm font-semibold mb-2">Create New Topic</p>
+                      <Input placeholder="Enter your New Topic" value={newTopicName} onChange={e => setNewTopicName(e.target.value)} className="mb-3" />
+                      <div className="flex items-center justify-between">
+                        <input type="file" multiple onChange={e => onUploadFiles(newTopicName.toLowerCase().replace(/\s+/g, "-"), e.target.files)} />
+                        <Button size="sm" onClick={onAddNewTopic}><Plus className="h-3.5 w-3.5 mr-1" /> Add Topic</Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Topic Tabs and Generated Content */}
+              <div className="mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">Not Reviewed</Badge>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={goToChat}>AI Chat</Button>
+                  <Button variant="outline" size="sm" onClick={exportAll}>Export All Topics</Button>
+                </div>
+              </div>
+
+              <Tabs value={activeTopic} onValueChange={setActiveTopic} className="w-full">
+                <TabsList>
+                  <TabsTrigger value="transition">Transition</TabsTrigger>
+                  <TabsTrigger value="governance">Governance</TabsTrigger>
+                  <TabsTrigger value="continuity">Business Continuity</TabsTrigger>
+                </TabsList>
+
+                {Object.entries(topicContents).map(([key, content]) => (
+                  <TabsContent key={key} value={key}>
+                    <div className="mt-4 p-4 rounded-lg bg-gradient-to-r from-primary/5 via-primary/3 to-transparent border-l-4 border-primary/30">
+                      <h4 className="font-semibold mb-2 text-primary capitalize">{key.replace(/-/g, ' ')} Overview :</h4>
+                      <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{content}</p>
+                    </div>
+                    <div className="flex items-center gap-2 mt-3">
+                      <Button size="sm" onClick={() => regenerateTopic(key)}>Regenerate Response</Button>
+                      <Button size="sm" variant="outline" onClick={() => exportTopic(key)}>Export Topic</Button>
+                    </div>
+                  </TabsContent>
+                ))}
+              </Tabs>
+            </AccordionContent>
+          </Card>
+        </AccordionItem>
+
         {/* Purpose */}
         {localData.purpose && <AccordionItem value="purpose" className="border-none">
             <Card className="gradient-card overflow-hidden border-2 border-primary/20 hover:border-primary/40 transition-colors">
